@@ -15,63 +15,77 @@ import org.apache.log4j.Logger;
 import fr.insee.arc.utils.utils.LoggerDispatcher;
 import fr.insee.arc.utils.utils.ManipString;
 
+import javax.swing.plaf.synth.SynthTextAreaUI;
+
 /**
  * Can decompress tarGZ archive file
- * 
- * @author S4LWO8
  *
+ * @author S4LWO8
  */
 public class TarGzDecompressor implements ArchiveExtractor {
     private static final Logger LOGGER = Logger.getLogger(TarGzDecompressor.class);
 
     @Override
-    public void extract(File archiveFile) throws IOException  {
-	LoggerDispatcher.info("decompress()" + archiveFile.getName(), LOGGER);
-	FileInputStream archiveInputStream = null;
+    public void extract(File archiveFile) throws IOException {
 
-	archiveInputStream = new FileInputStream(archiveFile);
-	File dir = new File(archiveFile + ".dir");
+        // DELETE AFTER TEST
+        System.out.println("Reading from archive " + archiveFile.toString());
 
-	GzipCompressorInputStream gzipIn = new GzipCompressorInputStream(archiveInputStream);
-	try (TarArchiveInputStream tarIn = new TarArchiveInputStream(gzipIn)) {
-	    TarArchiveEntry entry;
+        LoggerDispatcher.info("decompress()" + archiveFile.getName(), LOGGER);
+        FileInputStream archiveInputStream = null;
 
-	    while ((entry = (TarArchiveEntry) tarIn.getNextEntry()) != null) {
-		/** If the entry is a directory, create the directory. **/
-		if (entry.isDirectory()) {
-		    File f = new File(entry.getName());
-		    boolean created = f.mkdir();
-		    if (!created) {
-			LoggerDispatcher.info(String.format("Unable to create directory '%s', during extraction of archive contents.%n",
-				f.getAbsolutePath()), LOGGER);
-		    }
-		} else {
-			int count;
-		    byte data[] = new byte[32738];
-		    
-		    // temporary name for the file being uncompress
-		    FileOutputStream fos = new FileOutputStream(
-			    dir.getAbsolutePath() + File.separator + ManipString.redoEntryName(entry.getName()) + ".tmp", false);
-		    BufferedOutputStream dest = new BufferedOutputStream(fos, 32738);
-		    GZIPOutputStream zdest=new GZIPOutputStream(dest);
-		    try {
-			while ((count = tarIn.read(data, 0, 32738)) != -1) {
-				zdest.write(data, 0, count);
-				}
-	    	} finally {
-	    		zdest.close();
-	    		fos.close();
-		    }
-		    
-		    // rename the file when over makes it thread safe and available for other threads waiting
-		    new File( dir.getAbsolutePath() + File.separator + ManipString.redoEntryName(entry.getName()) + ".tmp")
-				.renameTo(new File(dir.getAbsolutePath() + File.separator + ManipString.redoEntryName(entry.getName())));
-		}
-	    }
+        archiveInputStream = new FileInputStream(archiveFile);
+        File dir = new File(archiveFile + ".dir");
 
-	}
+        GzipCompressorInputStream gzipIn = new GzipCompressorInputStream(archiveInputStream);
+        try (TarArchiveInputStream tarIn = new TarArchiveInputStream(gzipIn)) {
+            TarArchiveEntry entry;
 
-	LoggerDispatcher.info("Untar completed successfully!", LOGGER);
+            while ((entry = (TarArchiveEntry) tarIn.getNextEntry()) != null) {
+                /** If the entry is a directory, create the directory. **/
+                if (entry.isDirectory()) {
+
+                    System.out.println("Handling a directory entry");
+
+                    File f = new File(entry.getName());
+                    boolean created = f.mkdir();
+                    if (!created) {
+                        LoggerDispatcher.info(String.format("Unable to create directory '%s', during extraction of archive contents.%n",
+                                f.getAbsolutePath()), LOGGER);
+                    }
+                } else {
+
+                    System.out.println("Handling a file entry");
+
+                    int count;
+                    byte data[] = new byte[32738];
+
+                    // temporary name for the file being uncompress
+                    String tempFileName = dir.getAbsolutePath() + File.separator + ManipString.redoEntryName(entry.getName()) + ".tmp";
+
+                    System.out.println("Temporary file name is: " + tempFileName);
+
+                    FileOutputStream fos = new FileOutputStream(tempFileName, false);
+                    BufferedOutputStream dest = new BufferedOutputStream(fos, 32738);
+                    GZIPOutputStream zdest = new GZIPOutputStream(dest);
+                    try {
+                        while ((count = tarIn.read(data, 0, 32738)) != -1) {
+                            zdest.write(data, 0, count);
+                        }
+                    } finally {
+                        zdest.close();
+                        fos.close();
+                    }
+
+                    // rename the file when over makes it thread safe and available for other threads waiting
+                    new File(dir.getAbsolutePath() + File.separator + ManipString.redoEntryName(entry.getName()) + ".tmp")
+                            .renameTo(new File(dir.getAbsolutePath() + File.separator + ManipString.redoEntryName(entry.getName())));
+                }
+            }
+
+        }
+
+        LoggerDispatcher.info("Untar completed successfully!", LOGGER);
 
     }
 
